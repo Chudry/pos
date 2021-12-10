@@ -27,6 +27,13 @@ use App\Product;
 use App\Media;
 use Spatie\Activitylog\Models\Activity;
 
+use Salla\ZATCA\GenerateQrCode;
+use Salla\ZATCA\Tags\InvoiceDate;
+use Salla\ZATCA\Tags\InvoiceTaxAmount;
+use Salla\ZATCA\Tags\InvoiceTotalAmount;
+use Salla\ZATCA\Tags\Seller;
+use Salla\ZATCA\Tags\TaxNumber;
+
 class SellController extends Controller
 {
     /**
@@ -78,6 +85,16 @@ class SellController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $displayQRCodeAsBase64 = GenerateQrCode::fromArray([
+            new Seller('Salla'), // seller name        
+            new TaxNumber('1234567891'), // seller tax number
+            new InvoiceDate('2021-07-12T14:25:09Z'), // invoice date as Zulu ISO8601 @see https://en.wikipedia.org/wiki/ISO_8601
+            new InvoiceTotalAmount('100.00'), // invoice total amount
+            new InvoiceTaxAmount('15.00') // invoice tax amount
+            // TODO :: Support others tags
+        ])->render();
+
+        // dd($displayQRCodeAsBase64);
         $business_id = request()->session()->get('user.business_id');
         $is_woocommerce = $this->moduleUtil->isModuleInstalled('Woocommerce');
         $is_tables_enabled = $this->transactionUtil->isModuleEnabled('tables');
@@ -259,8 +276,8 @@ class SellController extends Controller
                             ->with($with)
                             ->addSelect('transactions.is_suspend', 'transactions.res_table_id', 'transactions.res_waiter_id', 'transactions.additional_notes')
                             ->get();
-
-                return view('sale_pos.partials.suspended_sales_modal')->with(compact('sales', 'is_tables_enabled', 'is_service_staff_enabled', 'transaction_sub_type'));
+                
+                return view('sale_pos.partials.suspended_sales_modal')->with(compact('sales', 'is_tables_enabled', 'is_service_staff_enabled', 'displayQRCodeAsBase64', 'transaction_sub_type'));
             }
 
             $with[] = 'payment_lines';
@@ -684,7 +701,22 @@ class SellController extends Controller
         // if (!auth()->user()->can('sell.view') && !auth()->user()->can('direct_sell.access') && !auth()->user()->can('view_own_sell_only')) {
         //     abort(403, 'Unauthorized action.');
         // }
-
+        $displayQRCodeAsBase64 = GenerateQrCode::fromArray([
+            new Seller('Salla'), // seller name        
+            new TaxNumber('1234567891'), // seller tax number
+            new InvoiceDate('2021-07-12T14:25:09Z'), // invoice date as Zulu ISO8601 @see https://en.wikipedia.org/wiki/ISO_8601
+            new InvoiceTotalAmount('100.00'), // invoice total amount
+            new InvoiceTaxAmount('15.00') // invoice tax amount
+            // TODO :: Support others tags
+        ])->render();
+        $generatedString = GenerateQrCode::fromArray([
+            new Seller('Salla'), // seller name        
+            new TaxNumber('1234567891'), // seller tax number
+            new InvoiceDate('2021-07-12T14:25:09Z'), // invoice date as Zulu ISO8601 @see https://en.wikipedia.org/wiki/ISO_8601
+            new InvoiceTotalAmount('100.00'), // invoice total amount
+            new InvoiceTaxAmount('15.00') // invoice tax amount
+            // TODO :: Support others tags
+        ])->toTLV();
         $business_id = request()->session()->get('user.business_id');
         $taxes = TaxRate::where('business_id', $business_id)
                             ->pluck('name', 'id');
@@ -737,7 +769,7 @@ class SellController extends Controller
         }
         $status_color_in_activity = Transaction::sales_order_statuses();
         $sales_orders = $sell->salesOrders();
-
+        // dd($generatedString);
         return view('sale_pos.show')
             ->with(compact(
                 'taxes',
@@ -751,7 +783,9 @@ class SellController extends Controller
                 'activities',
                 'statuses', 
                 'status_color_in_activity',
-                'sales_orders'
+                'sales_orders',
+                'displayQRCodeAsBase64',
+                'generatedString'
             ));
     }
 
